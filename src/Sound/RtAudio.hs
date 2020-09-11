@@ -1,7 +1,7 @@
 module Sound.RtAudio where
 
 import Foreign (peekArray)
-import Foreign.C (CInt (..), peekCString)
+import Foreign.C (CInt (..), peekCString, withCString)
 import Sound.RtAudio.Foreign
 
 data Api
@@ -56,3 +56,12 @@ getCompiledApis = do
   ptr <- rtaudio_compiled_api
   arr <- peekArray (fromIntegral n) ptr
   pure (fmap (toEnum . fromIntegral) arr)
+
+apiName :: Api -> IO String
+apiName api = rtaudio_api_name (fromIntegral (fromEnum api)) >>= peekCString
+
+apiDisplayName :: Api -> IO String
+apiDisplayName api = rtaudio_api_display_name (fromIntegral (fromEnum api)) >>= peekCString
+
+apiByName :: String -> IO Api
+apiByName name = fmap (toEnum . fromIntegral) (withCString name rtaudio_compiled_api_by_name)
