@@ -2,7 +2,7 @@
 
 module Sound.RtAudio.Foreign where
 
-import Foreign (Ptr)
+import Foreign (FunPtr, Ptr)
 import Foreign.C (CInt (..), CString)
 
 -- Will be mapped to Api
@@ -60,8 +60,8 @@ foreign import ccall "rtaudio_c.h rtaudio_create"
 
 -- //! Free an instance of struct rtaudio.
 -- RTAUDIOAPI void rtaudio_destroy(rtaudio_t audio);
-foreign import ccall "rtaudio_c.h rtaudio_destroy"
-  rtaudio_destroy :: Ptr AudioStruct -> IO ()
+foreign import ccall "rtaudio_c.h &rtaudio_destroy"
+  rtaudio_destroy :: FunPtr (Ptr AudioStruct -> IO ())
 
 -- //! Returns the audio API specifier for the current instance of
 -- //! RtAudio.  See RtAudio::getCurrentApi().

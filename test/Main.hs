@@ -41,6 +41,16 @@ testApiByName = testCase "apiByName" $ do
   -- and an invalid name should also get unspecific api
   actualApi3 @?= UnspecifiedApi
 
+testAudio :: TestTree
+testAudio = testCase "audio" $ do
+  apis <- getCompiledApis
+  let expectedApi = head apis
+  audio <- createAudio expectedApi
+  actualApi <- audioCurrentApi audio
+  actualApi @?= expectedApi
+  deviceCount <- audioDeviceCount audio
+  unless (deviceCount >= 0) (assertFailure "invalid device count")
+
 main :: IO ()
 main = defaultMain $ testGroup "RtAudio"
   [ testGetVersion
@@ -48,4 +58,5 @@ main = defaultMain $ testGroup "RtAudio"
   , testApiName
   , testApiDisplayName
   , testApiByName
+  , testAudio
   ]
