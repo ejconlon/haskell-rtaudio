@@ -22,7 +22,7 @@ source-repository head
   location: https://github.com/ejconlon/haskell-rtaudio
 
 Flag alsa {
-  Description:  Enable ALSA sequencer api
+  Description:  Enable ALSA api
   Default:      True
 }
 
@@ -32,7 +32,7 @@ Flag jack {
 }
 
 Flag core {
-  Description:  Enable CoreMIDI api
+  Description:  Enable CoreAudio api
   Default:      True
 }
 
