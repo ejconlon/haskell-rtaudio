@@ -1,14 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
---
--- see: https://github.com/sol/hpack
---
--- hash: 81c20a68de72bc4e286f1ef51092db66702d939e65d8fb8538fd6c03c20b5507
-
 name:           RtAudio
 version:        0.1.0
+synopsis:       Haskell wrapper for RtAudio, the lightweight, cross-platform Audio I/O library.
 description:    Please see the README on GitHub at <https://github.com/ejconlon/RtAudio#readme>
+category:       Sound
 homepage:       https://github.com/ejconlon/RtAudio#readme
 bug-reports:    https://github.com/ejconlon/RtAudio/issues
 author:         Eric Conlon
@@ -17,52 +13,70 @@ copyright:      (c) 2020 Eric Conlon
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
-extra-source-files:
-    README.md
+extra-source-files: README.md
+                    rtaudio/rtaudio_c.h
+                    rtaudio/RtAudio.h
 
 source-repository head
   type: git
-  location: https://github.com/ejconlon/RtAudio
+  location: https://github.com/ejconlon/haskell-rtaudio
+
+Flag alsa {
+  Description:  Enable ALSA sequencer api
+  Default:      True
+}
+
+Flag jack {
+  Description:  Enable JACK api
+  Default:      False
+}
+
+Flag core {
+  Description:  Enable CoreMIDI api
+  Default:      True
+}
+
+-- TODO(ejconlon) Add windows support
+-- Flag mm {
+--   Description:  Enable Windows Multimedia Library api
+--   Default:      False
+-- }
 
 library
-  exposed-modules:
-      Rtaudio.Main
-  other-modules:
-      Paths_RtAudio
-  hs-source-dirs:
-      src
-  default-extensions: ConstraintKinds DeriveFunctor DeriveFoldable DeriveGeneric DeriveTraversable DerivingStrategies FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving KindSignatures MultiParamTypeClasses Rank2Types TypeApplications TypeFamilies
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds
-  build-depends:
-      base >=4.12 && <5
+  exposed-modules: Sound.RtAudio
+  other-modules: Sound.RtAudio.Foreign
   default-language: Haskell2010
+  hs-source-dirs: src
+  build-depends: base >=4.12 && <5
+  include-dirs:        rtaudio
+  extra-libraries:     stdc++
+  c-sources:           rtaudio/RtAudio.cpp
+                       rtaudio/rtaudio_c.cpp
+  if flag(alsa) && os(linux)
+    cc-options:       -D__LINUX_ALSA__
+    extra-libraries:  asound pthread
+  if flag(jack) && (os(linux) || os(darwin))
+    cc-options:       -D__UNIX_JACK__
+    extra-libraries:  jack
+  if flag(core) && os(darwin)
+    cc-options:       -D__MACOSX_CORE__
+    frameworks:       CoreAudio CoreFoundation
+    -- NOTE(ejconlon) This is to make the c ffi wrapper actually catch
+    -- the c++ exceptions instead of simply aborting.
+    -- Cribbed from https://github.com/fpco/inline-c/pull/89
+    -- avoid https://gitlab.haskell.org/ghc/ghc/issues/11829
+    ld-options:        -Wl,-keep_dwarf_unwind
+    ghc-options:       -pgmc=clang++
+  -- TODO(ejconlon) Add windows support
 
-executable RtAudio-exe
-  main-is: Main.hs
-  other-modules:
-      Paths_RtAudio
-  hs-source-dirs:
-      app
-  default-extensions: ConstraintKinds DeriveFunctor DeriveFoldable DeriveGeneric DeriveTraversable DerivingStrategies FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving KindSignatures MultiParamTypeClasses Rank2Types TypeApplications TypeFamilies
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -threaded -rtsopts -with-rtsopts=-N
-  build-depends:
-      RtAudio
-    , base >=4.12 && <5
-  default-language: Haskell2010
-
-test-suite RtAudio-test
+test-suite rtaudio-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
-  other-modules:
-      Test.Rtaudio.SimpleTest
-      Paths_RtAudio
-  hs-source-dirs:
-      test
-  default-extensions: ConstraintKinds DeriveFunctor DeriveFoldable DeriveGeneric DeriveTraversable DerivingStrategies FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving KindSignatures MultiParamTypeClasses Rank2Types TypeApplications TypeFamilies
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -threaded -rtsopts -with-rtsopts=-N
+  hs-source-dirs: test
   build-depends:
-      RtAudio
-    , base >=4.12 && <5
-    , tasty
-    , tasty-hunit
-  default-language: Haskell2010
+      base
+    , RtAudio
+    , tasty >= 1.2.3 && < 2
+    , tasty-hunit >= 0.10.0.2 && < 1
+  default-language:   Haskell2010
+  ghc-options: -threaded -rtsopts
