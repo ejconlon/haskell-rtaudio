@@ -3,13 +3,25 @@
 module Sound.RtAudio.Foreign where
 
 import Foreign (FunPtr, Ptr)
-import Foreign.C (CInt (..), CString)
+import Foreign.C (CDouble (..), CInt (..), CString (..), CUInt (..))
 
 -- Will be mapped to Api
 type ApiEnum = CInt
 
+-- Will be mapped to ErrorCode
+type ErrorCodeEnum = CInt
+
 -- Opaque `rtaudio` struct
 data AudioStruct
+
+-- TODO(ejconlon) Fill in
+data DeviceInfoStruct
+
+type StreamStatusFlag = CUInt
+
+type StreamCallback = Ptr () -> Ptr () -> CUInt -> CDouble -> StreamStatusFlag -> Ptr () -> IO ()
+
+type ErrorCallback = ErrorCodeEnum -> CString -> IO ()
 
 -- //! Determine the current RtAudio version.  See \ref RtAudio::getVersion().
 foreign import ccall "rtaudio_c.h rtaudio_version"
@@ -74,3 +86,95 @@ foreign import ccall "rtaudio_c.h rtaudio_current_api"
 -- RTAUDIOAPI int rtaudio_device_count(rtaudio_t audio);
 foreign import ccall "rtaudio_c.h rtaudio_device_count"
   rtaudio_device_count :: Ptr AudioStruct -> IO CInt
+
+-- //! Return a struct rtaudio_device_info for a specified device number.
+-- //! See \ref RtAudio::getDeviceInfo().
+-- RTAUDIOAPI rtaudio_device_info_t rtaudio_get_device_info(rtaudio_t audio,
+--                                                          int i);
+-- foreign import ccall "rtaudio_c.h rtaudio_get_device_info"
+--   rtaudio_get_device_info :: Ptr AudioStruct -> CInt -> IO DeviceInfoStruct
+
+-- //! Returns the index of the default output device.  See \ref
+-- //! RtAudio::getDefaultOutputDevice().
+-- RTAUDIOAPI unsigned int rtaudio_get_default_output_device(rtaudio_t audio);
+foreign import ccall "rtaudio_c.h rtaudio_get_default_output_device"
+  rtaudio_get_default_output_device :: Ptr AudioStruct -> IO CUInt
+
+-- //! Returns the index of the default input device.  See \ref
+-- //! RtAudio::getDefaultInputDevice().
+-- RTAUDIOAPI unsigned int rtaudio_get_default_input_device(rtaudio_t audio);
+foreign import ccall "rtaudio_c.h rtaudio_get_default_input_device"
+  rtaudio_get_default_input_device :: Ptr AudioStruct -> IO CUInt
+
+-- //! Opens a stream with the specified parameters.  See \ref RtAudio::openStream().
+-- //! \return an \ref rtaudio_error.
+-- RTAUDIOAPI int
+-- rtaudio_open_stream(rtaudio_t audio, rtaudio_stream_parameters_t *output_params,
+--                     rtaudio_stream_parameters_t *input_params,
+--                     rtaudio_format_t format, unsigned int sample_rate,
+--                     unsigned int *buffer_frames, rtaudio_cb_t cb,
+--                     void *userdata, rtaudio_stream_options_t *options,
+--                     rtaudio_error_cb_t errcb);
+
+-- //! Closes a stream and frees any associated stream memory.  See \ref RtAudio::closeStream().
+-- RTAUDIOAPI void rtaudio_close_stream(rtaudio_t audio);
+foreign import ccall "rtaudio_c.h rtaudio_close_stream"
+  rtaudio_close_stream :: Ptr AudioStruct -> IO ()
+
+-- //! Starts a stream.  See \ref RtAudio::startStream().
+-- RTAUDIOAPI int rtaudio_start_stream(rtaudio_t audio);
+foreign import ccall "rtaudio_c.h rtaudio_start_stream"
+  rtaudio_start_stream :: Ptr AudioStruct -> IO CInt
+
+-- //! Stop a stream, allowing any samples remaining in the output queue
+-- //! to be played.  See \ref RtAudio::stopStream().
+-- RTAUDIOAPI int rtaudio_stop_stream(rtaudio_t audio);
+foreign import ccall "rtaudio_c.h rtaudio_stop_stream"
+  rtaudio_stop_stream :: Ptr AudioStruct -> IO CInt
+
+-- //! Stop a stream, discarding any samples remaining in the
+-- //! input/output queue.  See \ref RtAudio::abortStream().
+-- RTAUDIOAPI int rtaudio_abort_stream(rtaudio_t audio);
+foreign import ccall "rtaudio_c.h rtaudio_abort_stream"
+  rtaudio_abort_stream :: Ptr AudioStruct -> IO CInt
+
+-- //! Returns 1 if a stream is open and false if not.  See \ref RtAudio::isStreamOpen().
+-- RTAUDIOAPI int rtaudio_is_stream_open(rtaudio_t audio);
+foreign import ccall "rtaudio_c.h rtaudio_is_stream_open"
+  rtaudio_is_stream_open :: Ptr AudioStruct -> IO CInt
+
+-- //! Returns 1 if a stream is running and false if it is stopped or not
+-- //! open.  See \ref RtAudio::isStreamRunning().
+-- RTAUDIOAPI int rtaudio_is_stream_running(rtaudio_t audio);
+foreign import ccall "rtaudio_c.h rtaudio_is_stream_running"
+  rtaudio_is_stream_running :: Ptr AudioStruct -> IO CInt
+
+-- //! Returns the number of elapsed seconds since the stream was
+-- //! started.  See \ref RtAudio::getStreamTime().
+-- RTAUDIOAPI double rtaudio_get_stream_time(rtaudio_t audio);
+foreign import ccall "rtaudio_c.h rtaudio_get_stream_time"
+  rtaudio_get_stream_time :: Ptr AudioStruct -> IO CDouble
+
+-- //! Set the stream time to a time in seconds greater than or equal to
+-- //! 0.0.  See \ref RtAudio::setStreamTime().
+-- RTAUDIOAPI void rtaudio_set_stream_time(rtaudio_t audio, double time);
+foreign import ccall "rtaudio_c.h rtaudio_set_stream_time"
+  rtaudio_set_stream_time :: Ptr AudioStruct -> CDouble -> IO ()
+
+-- //! Returns the internal stream latency in sample frames.  See \ref
+-- //! RtAudio::getStreamLatency().
+-- RTAUDIOAPI int rtaudio_get_stream_latency(rtaudio_t audio);
+foreign import ccall "rtaudio_c.h rtaudio_get_stream_latency"
+  rtaudio_get_stream_latency :: Ptr AudioStruct -> IO CInt
+
+-- //! Returns actual sample rate in use by the stream.  See \ref
+-- //! RtAudio::getStreamSampleRate().
+-- RTAUDIOAPI unsigned int rtaudio_get_stream_sample_rate(rtaudio_t audio);
+foreign import ccall "rtaudio_c.h rtaudio_get_stream_sample_rate"
+  rtaudio_get_stream_sample_rate :: Ptr AudioStruct -> IO CUInt
+
+-- //! Specify whether warning messages should be printed to stderr.  See
+-- //! \ref RtAudio::showWarnings().
+-- RTAUDIOAPI void rtaudio_show_warnings(rtaudio_t audio, int show);
+foreign import ccall "rtaudio_c.h rtaudio_show_warnings"
+  rtaudio_show_warnings :: Ptr AudioStruct -> CInt -> IO ()

@@ -1,11 +1,35 @@
+{-# LANGUAGE DerivingVia #-}
+
 module Sound.RtAudio where
 
 import Control.Exception (Exception, throwIO)
 import Control.Monad (unless)
+import Data.Bits ((.&.))
 import Foreign (Ptr, nullPtr, peekArray)
 import Foreign.C (CInt (..), peekCString, withCString)
 import Foreign.ForeignPtr (ForeignPtr, newForeignPtr, withForeignPtr)
+import Sound.RtAudio.Flag (Flag, BitFlag (..))
 import Sound.RtAudio.Foreign
+
+newtype StreamStatus = StreamStatus { unStreamStatus :: Int }
+  deriving (Eq, Show)
+  deriving (Semigroup, Monoid, Flag) via (BitFlag Int)
+
+statusInputUnderflow, statusOutputUnderflow :: StreamStatus
+statusInputUnderflow = StreamStatus 0x1
+statusOutputUnderflow = StreamStatus 0x2
+
+newtype StreamFlags = StreamFlags { unStreamFlags :: Int }
+  deriving (Eq, Show)
+  deriving (Semigroup, Monoid, Flag) via (BitFlag Int)
+
+flagsNoninterleaved, flagsMinimizeLatency, flagsScheduleRealtime, flagsAlsaUseDefault, flagsJackDontConnect :: StreamFlags
+flagsNoninterleaved = StreamFlags 0x1
+flagsMinimizeLatency = StreamFlags 0x2
+flagsHogDevice = StreamFlags 0x4
+flagsScheduleRealtime = StreamFlags 0x8
+flagsAlsaUseDefault = StreamFlags 0x10
+flagsJackDontConnect = StreamFlags 0x20
 
 data Api
   = UnspecifiedApi
@@ -45,6 +69,64 @@ instance Enum Api where
   toEnum 7 = AsioApi
   toEnum 8 = DsApi
   toEnum 9 = DummyApi
+  toEnum i = error ("Undefined Api: " ++ show i)
+
+-- typedef enum rtaudio_error {
+--   RTAUDIO_ERROR_WARNING,           /*!< A non-critical error. */
+--   RTAUDIO_ERROR_DEBUG_WARNING,     /*!< A non-critical error which might be useful for debugging. */
+--   RTAUDIO_ERROR_UNSPECIFIED,       /*!< The default, unspecified error type. */
+--   RTAUDIO_ERROR_NO_DEVICES_FOUND,  /*!< No devices found on system. */
+--   RTAUDIO_ERROR_INVALID_DEVICE,    /*!< An invalid device ID was specified. */
+--   RTAUDIO_ERROR_MEMORY_ERROR,      /*!< An error occured during memory allocation. */
+--   RTAUDIO_ERROR_INVALID_PARAMETER, /*!< An invalid parameter was specified to a function. */
+--   RTAUDIO_ERROR_INVALID_USE,       /*!< The function was called incorrectly. */
+--   RTAUDIO_ERROR_DRIVER_ERROR,      /*!< A system driver error occured. */
+--   RTAUDIO_ERROR_SYSTEM_ERROR,      /*!< A system error occured. */
+--   RTAUDIO_ERROR_THREAD_ERROR,      /*!< A thread error occured. */
+-- } rtaudio_error_t;
+
+data ErrorCode =
+    WarningCode
+  | DebugWarningCode
+  | UnspecifiedCode
+  | NoDevicesFoundCode
+  | InvalidDeviceCode
+  | MemoryErrorCode
+  | InvalidParameterCode
+  | InvalidUseCode
+  | DriverErrorCode
+  | SystemErrorCode
+  | ThreadErrorCode
+  deriving (Eq, Show)
+
+instance Bounded ErrorCode where
+  minBound = WarningCode
+  maxBound = ThreadErrorCode
+
+instance Enum ErrorCode where
+  fromEnum WarningCode = 0
+  fromEnum DebugWarningCode = 1
+  fromEnum UnspecifiedCode = 2
+  fromEnum NoDevicesFoundCode = 3
+  fromEnum InvalidDeviceCode = 4
+  fromEnum MemoryErrorCode = 5
+  fromEnum InvalidParameterCode = 6
+  fromEnum InvalidUseCode = 7
+  fromEnum DriverErrorCode = 8
+  fromEnum SystemErrorCode = 9
+  fromEnum ThreadErrorCode = 10
+  toEnum 0 = WarningCode
+  toEnum 1 = DebugWarningCode
+  toEnum 2 = UnspecifiedCode
+  toEnum 3 = NoDevicesFoundCode
+  toEnum 4 = InvalidDeviceCode
+  toEnum 5 = MemoryErrorCode
+  toEnum 6 = InvalidParameterCode
+  toEnum 7 = InvalidUseCode
+  toEnum 8 = DriverErrorCode
+  toEnum 9 = SystemErrorCode
+  toEnum 10 = ThreadErrorCode
+  toEnum i = error ("Undefined ErrorCode: " ++ show i)
 
 -- | An internal RtAudio error
 newtype Error = Error String deriving (Eq, Show)
