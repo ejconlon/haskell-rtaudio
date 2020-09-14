@@ -3,7 +3,7 @@ version: 2.1
 parameters:
   project:
     type: string
-    default: "RtAudio"
+    default: "haskell-rtaudio"
   cache_ver:
     type: string
     default: "v1"
@@ -77,14 +77,13 @@ workflows:
     jobs:
       - stack_build:
           lts_ghc_ver: 8.8.4
-      # TODO(ejconlon) Enable before release
-      # - cabal_build:
-      #     name: cabal_build_8_8
-      #     ghc_ver: 8.8.4
-      #     requires:
-      #       - stack_build
-      # - cabal_build:
-      #     name: cabal_build_8_10
-      #     ghc_ver: 8.10.2
-      #     requires:
-      #       - stack_build
+      - cabal_build:
+          name: cabal_build_8_8
+          ghc_ver: 8.8.4
+          requires:
+            - stack_build
+      - cabal_build:
+          name: cabal_build_8_10
+          ghc_ver: 8.10.2
+          requires:
+            - stack_build
