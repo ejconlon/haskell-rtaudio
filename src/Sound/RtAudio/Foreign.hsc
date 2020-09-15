@@ -33,34 +33,34 @@ newtype Format = Format { unFormat :: Word64 }
   deriving (Eq, Show)
   deriving (Semigroup, Monoid, Flag) via (BitFlag Word64)
 
--- TODO(ejconlon) Get these from defines
 formatInt8, formatInt16, formatInt24, formatInt32, formatFloat32, formatFloat64 :: Format
-formatInt8 = Format 0x01
-formatInt16 = Format 0x02
-formatInt24 = Format 0x04
-formatInt32 = Format 0x08
-formatFloat32 = Format 0x10
-formatFloat64 =Format 0x20
-
-newtype StreamStatus = StreamStatus { unStreamStatus :: Word32 }
-  deriving (Eq, Show)
-  deriving (Semigroup, Monoid, Flag) via (BitFlag Word32)
-
-statusInputUnderflow, statusOutputUnderflow :: StreamStatus
-statusInputUnderflow = StreamStatus 0x1
-statusOutputUnderflow = StreamStatus 0x2
+formatInt8 = Format #{const RTAUDIO_FORMAT_SINT8}
+formatInt16 = Format #{const RTAUDIO_FORMAT_SINT16}
+formatInt24 = Format #{const RTAUDIO_FORMAT_SINT24}
+formatInt32 = Format #{const RTAUDIO_FORMAT_SINT32}
+formatFloat32 = Format #{const RTAUDIO_FORMAT_FLOAT32}
+formatFloat64 = Format #{const RTAUDIO_FORMAT_FLOAT64}
 
 newtype StreamFlags = StreamFlags { unStreamFlags :: Word32 }
   deriving (Eq, Show)
   deriving (Semigroup, Monoid, Flag) via (BitFlag Word32)
 
 flagsNoninterleaved, flagsMinimizeLatency, flagsScheduleRealtime, flagsAlsaUseDefault, flagsJackDontConnect :: StreamFlags
-flagsNoninterleaved = StreamFlags 0x1
-flagsMinimizeLatency = StreamFlags 0x2
-flagsHogDevice = StreamFlags 0x4
-flagsScheduleRealtime = StreamFlags 0x8
-flagsAlsaUseDefault = StreamFlags 0x10
-flagsJackDontConnect = StreamFlags 0x20
+flagsNoninterleaved = StreamFlags #{const RTAUDIO_FLAGS_NONINTERLEAVED}
+flagsMinimizeLatency = StreamFlags #{const RTAUDIO_FLAGS_MINIMIZE_LATENCY}
+flagsHogDevice = StreamFlags #{const RTAUDIO_FLAGS_HOG_DEVICE}
+flagsScheduleRealtime = StreamFlags #{const RTAUDIO_FLAGS_SCHEDULE_REALTIME}
+flagsAlsaUseDefault = StreamFlags #{const RTAUDIO_FLAGS_ALSA_USE_DEFAULT}
+flagsJackDontConnect = StreamFlags 0x20 -- #{const RTAUDIO_FLAGS_JACK_DONT_CONNECT}
+-- TODO(ejconlon) Why does this one fail? ^^
+
+newtype StreamStatus = StreamStatus { unStreamStatus :: Word32 }
+  deriving (Eq, Show)
+  deriving (Semigroup, Monoid, Flag) via (BitFlag Word32)
+
+statusInputUnderflow, statusOutputUnderflow :: StreamStatus
+statusInputUnderflow = StreamStatus #{const RTAUDIO_STATUS_INPUT_OVERFLOW}
+statusOutputUnderflow = StreamStatus #{const RTAUDIO_STATUS_OUTPUT_UNDERFLOW}
 
 data Api
   = UnspecifiedApi
