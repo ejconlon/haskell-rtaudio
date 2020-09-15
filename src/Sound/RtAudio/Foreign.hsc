@@ -2,8 +2,11 @@
 
 module Sound.RtAudio.Foreign where
 
-import Foreign (FunPtr, Ptr)
-import Foreign.C (CDouble (..), CInt (..), CString (..), CUInt (..))
+#include "rtaudio_c.h"
+#include "wrapper.h"
+
+import Foreign (FunPtr, Ptr, Storable (..), nullPtr)
+import Foreign.C (CBool (..), CDouble (..), CInt (..), CString (..), CUInt (..))
 
 -- Will be mapped to Api
 type ApiEnum = CInt
@@ -14,8 +17,99 @@ type ErrorCodeEnum = CInt
 -- Opaque `rtaudio` struct
 data AudioStruct
 
--- TODO(ejconlon) Fill in
-data DeviceInfoStruct
+data DeviceInfoStruct = DeviceInfoStruct
+  { disProbed :: !CInt
+  , disOutputChannels :: !CUInt
+  , disInputChannels :: !CUInt
+  , disDuplexChannels :: !CUInt
+  , disIsDefaultOutput :: !CBool
+  , disIsDefaultInput :: !CBool
+  , disNativeFormats :: !CUInt
+  , disPreferredSampleRate :: !CUInt
+  , disSampleRates :: !(Ptr CInt)
+  , disName :: !CString
+  } deriving (Eq, Show)
+
+newDeviceInfoStruct :: DeviceInfoStruct
+newDeviceInfoStruct = DeviceInfoStruct 0 0 0 0 0 0 0 0 nullPtr nullPtr
+
+instance Storable DeviceInfoStruct where
+  sizeOf _ = #{size rtaudio_device_info_t}
+  alignment _ = #{alignment rtaudio_device_info_t}
+  poke ptr s = do
+    #{poke rtaudio_device_info_t, probed} ptr (disProbed s)
+    #{poke rtaudio_device_info_t, output_channels} ptr (disOutputChannels s)
+    #{poke rtaudio_device_info_t, input_channels} ptr (disInputChannels s)
+    #{poke rtaudio_device_info_t, duplex_channels} ptr (disDuplexChannels s)
+    #{poke rtaudio_device_info_t, is_default_output} ptr (disIsDefaultOutput s)
+    #{poke rtaudio_device_info_t, is_default_input} ptr (disIsDefaultInput s)
+    #{poke rtaudio_device_info_t, native_formats} ptr (disNativeFormats s)
+    #{poke rtaudio_device_info_t, preferred_sample_rate} ptr (disPreferredSampleRate s)
+    #{poke rtaudio_device_info_t, sample_rates} ptr (disSampleRates s)
+    #{poke rtaudio_device_info_t, name} ptr (disName s)
+  peek ptr =
+    DeviceInfoStruct <$>
+      #{peek rtaudio_device_info_t, probed} ptr <*>
+      #{peek rtaudio_device_info_t, output_channels} ptr <*>
+      #{peek rtaudio_device_info_t, input_channels} ptr <*>
+      #{peek rtaudio_device_info_t, duplex_channels} ptr <*>
+      #{peek rtaudio_device_info_t, is_default_output} ptr <*>
+      #{peek rtaudio_device_info_t, is_default_input} ptr <*>
+      #{peek rtaudio_device_info_t, native_formats} ptr <*>
+      #{peek rtaudio_device_info_t, preferred_sample_rate} ptr <*>
+      #{peek rtaudio_device_info_t, sample_rates} ptr <*>
+      #{peek rtaudio_device_info_t, name} ptr
+
+data StreamParamsStruct = StreamParamsStruct
+  { spsDeviceId :: !CUInt
+  , spsNumChannels :: !CUInt
+  , spsFirstChannel :: !CUInt
+  } deriving (Eq, Show)
+
+newStreamParamsStruct :: StreamParamsStruct
+newStreamParamsStruct = StreamParamsStruct 0 0 0
+
+instance Storable StreamParamsStruct where
+  sizeOf _ = #{size rtaudio_stream_parameters_t}
+  alignment _ = #{alignment rtaudio_stream_parameters_t}
+  poke ptr s = do
+    #{poke rtaudio_stream_parameters_t, device_id} ptr (spsDeviceId s)
+    #{poke rtaudio_stream_parameters_t, num_channels} ptr (spsNumChannels s)
+    #{poke rtaudio_stream_parameters_t, first_channel} ptr (spsFirstChannel s)
+  peek ptr =
+    StreamParamsStruct <$>
+      #{peek rtaudio_stream_parameters_t, device_id} ptr <*>
+      #{peek rtaudio_stream_parameters_t, num_channels} ptr <*>
+      #{peek rtaudio_stream_parameters_t, first_channel} ptr
+
+data StreamOptsStruct = StreamOptsStruct
+  { sosFlags :: !StreamFlag
+  , sosNumBuffers :: !CUInt
+  , sosPriority :: !CInt
+  , sosName :: !CString
+  } deriving (Eq, Show)
+
+newStreamOptsStruct :: StreamOptsStruct
+newStreamOptsStruct = StreamOptsStruct 0 0 0 nullPtr
+
+instance Storable StreamOptsStruct where
+  sizeOf _ = #{size rtaudio_stream_options_t}
+  alignment _ = #{alignment rtaudio_stream_options_t}
+  poke ptr s = do
+    #{poke rtaudio_stream_options_t, flags} ptr (sosFlags s)
+    #{poke rtaudio_stream_options_t, num_buffers} ptr (sosNumBuffers s)
+    #{poke rtaudio_stream_options_t, priority} ptr (sosPriority s)
+    #{poke rtaudio_stream_options_t, name} ptr (sosName s)
+  peek ptr =
+    StreamOptsStruct <$>
+      #{peek rtaudio_stream_options_t, flags} ptr <*>
+      #{peek rtaudio_stream_options_t, num_buffers} ptr <*>
+      #{peek rtaudio_stream_options_t, priority} ptr <*>
+      #{peek rtaudio_stream_options_t, name} ptr
+
+type FormatFlag = CUInt
+
+type StreamFlag = CUInt
 
 type StreamStatusFlag = CUInt
 
@@ -87,12 +181,12 @@ foreign import ccall "rtaudio_c.h rtaudio_current_api"
 foreign import ccall "rtaudio_c.h rtaudio_device_count"
   rtaudio_device_count :: Ptr AudioStruct -> IO CInt
 
--- //! Return a struct rtaudio_device_info for a specified device number.
+-- //! Return a rtaudio_device_info_t for a specified device number.
 -- //! See \ref RtAudio::getDeviceInfo().
 -- RTAUDIOAPI rtaudio_device_info_t rtaudio_get_device_info(rtaudio_t audio,
 --                                                          int i);
--- foreign import ccall "rtaudio_c.h rtaudio_get_device_info"
---   rtaudio_get_device_info :: Ptr AudioStruct -> CInt -> IO DeviceInfoStruct
+foreign import ccall "wrapper.h wrap_rtaudio_get_device_info"
+  rtaudio_get_device_info :: Ptr AudioStruct -> CInt -> Ptr DeviceInfoStruct -> IO ()
 
 -- //! Returns the index of the default output device.  See \ref
 -- //! RtAudio::getDefaultOutputDevice().
@@ -115,6 +209,18 @@ foreign import ccall "rtaudio_c.h rtaudio_get_default_input_device"
 --                     unsigned int *buffer_frames, rtaudio_cb_t cb,
 --                     void *userdata, rtaudio_stream_options_t *options,
 --                     rtaudio_error_cb_t errcb);
+foreign import ccall "rtaudio_c.h rtaudio_open_stream"
+  rtaudio_open_stream :: Ptr AudioStruct
+                      -> Ptr StreamParamsStruct
+                      -> Ptr StreamParamsStruct
+                      -> FormatFlag
+                      -> CUInt
+                      -> Ptr CUInt
+                      -> FunPtr StreamCallback
+                      -> Ptr ()
+                      -> Ptr StreamOptsStruct
+                      -> FunPtr ErrorCallback
+                      -> IO CUInt
 
 -- //! Closes a stream and frees any associated stream memory.  See \ref RtAudio::closeStream().
 -- RTAUDIOAPI void rtaudio_close_stream(rtaudio_t audio);
