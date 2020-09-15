@@ -12,6 +12,12 @@ assertNonEmpty thing lst = when (null lst) (assertFailure (thing ++ " empty"))
 assertPositive :: (Num a, Ord a, Show a) => String -> a -> IO ()
 assertPositive thing val = when (val < 0) (assertFailure (thing ++ " <= 0 (" ++ show val ++ ")"))
 
+assertInRange :: (Ord a, Show a) => String -> a -> a -> a -> IO ()
+assertInRange thing lo hi val
+  | val < lo = assertFailure (thing ++ " less than min bound (" ++ show val ++ " < " ++ show lo ++ ")")
+  | val > hi = assertFailure (thing ++ " greater than max bound (" ++ show val ++ " > " ++ show hi ++ ")")
+  | otherwise = pure ()
+
 testGetVersion :: TestTree
 testGetVersion = testCase "getVersion" $ do
   actualVersion <- getVersion
@@ -54,13 +60,17 @@ testAudio = testCase "audio" $ do
   apis <- getCompiledApis
   let expectedApi = head apis
   audio <- createAudio expectedApi
-  actualApi <- audioCurrentApi audio
+  actualApi <- currentApi audio
   actualApi @?= expectedApi
-  deviceCount <- audioDeviceCount audio
-  assertPositive "device count" deviceCount
-  for_ [0 .. deviceCount - 1] $ \index -> do
-    info <- audioGetDeviceInfo audio index
+  numDevs <- deviceCount audio
+  assertPositive "device count" numDevs
+  for_ [0 .. numDevs - 1] $ \index -> do
+    info <- getDeviceInfo audio index
     assertNonEmpty "device info name" (diName info)
+  defOut <- getDefaultOutputDevice audio
+  assertInRange "default output" 0 (numDevs - 1) defOut
+  defIn <- getDefaultInputDevice audio
+  assertInRange "default input" 0 (numDevs - 1) defIn
 
 main :: IO ()
 main = defaultMain $ testGroup "RtAudio"

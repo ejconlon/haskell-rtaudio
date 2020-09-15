@@ -27,9 +27,11 @@ module Sound.RtAudio
   , apiDisplayName
   , apiByName
   , createAudio
-  , audioCurrentApi
-  , audioDeviceCount
-  , audioGetDeviceInfo
+  , currentApi
+  , deviceCount
+  , getDeviceInfo
+  , getDefaultOutputDevice
+  , getDefaultInputDevice
   ) where
 
 import Control.Exception (Exception, throwIO)
@@ -96,17 +98,25 @@ createAudio api = do
   pure (Audio fptr)
 
 -- | Returns the API used by the 'Audio' interface.
-audioCurrentApi :: Audio -> IO Api
-audioCurrentApi = flip withAudioStructUnguarded (fmap toApi . rtaudio_current_api)
+currentApi :: Audio -> IO Api
+currentApi = flip withAudioStructUnguarded (fmap toApi . rtaudio_current_api)
 
 -- | Returns the number of devices available to the 'Audio' interface.
-audioDeviceCount :: Audio -> IO Int
-audioDeviceCount = flip withAudioStructUnguarded (fmap fromIntegral . rtaudio_device_count)
+deviceCount :: Audio -> IO Int
+deviceCount = flip withAudioStructUnguarded (fmap fromIntegral . rtaudio_device_count)
 
 -- | Returns 'DeviceInfo' for the given audio device.
 -- The index must be less than or equal to the count returned by 'audioDeviceCount',
 -- otherwise it throws an 'Error'.
-audioGetDeviceInfo :: Audio -> Int -> IO DeviceInfo
-audioGetDeviceInfo audio index = withAudioStruct audio $ \ptr -> alloca $ \dptr -> do
+getDeviceInfo :: Audio -> Int -> IO DeviceInfo
+getDeviceInfo audio index = withAudioStruct audio $ \ptr -> alloca $ \dptr -> do
   rtaudio_get_device_info ptr (fromIntegral index) dptr
   peek dptr
+
+getDefaultOutputDevice :: Audio -> IO Int
+getDefaultOutputDevice audio = withAudioStruct audio $ \ptr ->
+  fmap fromIntegral (rtaudio_get_default_output_device ptr)
+
+getDefaultInputDevice :: Audio -> IO Int
+getDefaultInputDevice audio = withAudioStruct audio $ \ptr ->
+  fmap fromIntegral (rtaudio_get_default_output_device ptr)
