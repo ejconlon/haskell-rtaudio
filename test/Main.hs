@@ -1,9 +1,16 @@
 module Main (main) where
 
-import Control.Monad (unless)
+import Control.Monad (when)
+import Data.Foldable (for_)
 import Sound.RtAudio
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit (assertFailure, testCase, (@?=))
+
+assertNonEmpty :: String -> [a] -> IO ()
+assertNonEmpty thing lst = when (null lst) (assertFailure (thing ++ " empty"))
+
+assertPositive :: (Num a, Ord a, Show a) => String -> a -> IO ()
+assertPositive thing val = when (val < 0) (assertFailure (thing ++ " <= 0 (" ++ show val ++ ")"))
 
 testGetVersion :: TestTree
 testGetVersion = testCase "getVersion" $ do
@@ -14,7 +21,7 @@ testGetCompiledApis :: TestTree
 testGetCompiledApis = testCase "getCompiledApis" $ do
   compiledApis <- getCompiledApis
   let numApis = length compiledApis
-  unless (numApis > 0) (assertFailure "no compiled apis")
+  assertPositive "num compiled apis" numApis
 
 testApiName :: TestTree
 testApiName = testCase "apiName" $ do
@@ -50,7 +57,10 @@ testAudio = testCase "audio" $ do
   actualApi <- audioCurrentApi audio
   actualApi @?= expectedApi
   deviceCount <- audioDeviceCount audio
-  unless (deviceCount >= 0) (assertFailure "invalid device count")
+  assertPositive "device count" deviceCount
+  for_ [0 .. deviceCount - 1] $ \index -> do
+    info <- audioGetDeviceInfo audio index
+    assertNonEmpty "device info name" (diName info)
 
 main :: IO ()
 main = defaultMain $ testGroup "RtAudio"

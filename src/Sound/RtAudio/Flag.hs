@@ -3,7 +3,7 @@ module Sound.RtAudio.Flag
   , Flag (..)
   ) where
 
-import Data.Bits (Bits, (.&.), (.|.), zeroBits)
+import Data.Bits (Bits, zeroBits, (.&.), (.|.))
 
 -- | Flags in the C sense are monoids that act like sets.
 class Monoid a => Flag a where
