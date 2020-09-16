@@ -11,10 +11,6 @@ update-sources:
 	curl --output rtaudio/rtaudio_c.cpp $(RT_AUDIO_URL)/rtaudio_c.cpp
 	curl --output rtaudio/rtaudio_c.h $(RT_AUDIO_URL)/rtaudio_c.h
 
-.PHONY: citest
-citest: build
-	# All we can do on CI is build.
-
 .PHONY: example-report
 example-report: build
 	# Print a report of availble audio device info
