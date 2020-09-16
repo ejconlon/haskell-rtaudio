@@ -3,6 +3,7 @@ module Main (main) where
 import Control.Monad (when)
 import Data.Foldable (for_)
 import Sound.RtAudio
+import Sound.RtAudio.Report
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit (assertFailure, testCase, (@?=))
 
@@ -18,10 +19,13 @@ assertInRange thing lo hi val
   | val > hi = assertFailure (thing ++ " greater than max bound (" ++ show val ++ " > " ++ show hi ++ ")")
   | otherwise = pure ()
 
+expectedVersion :: String
+expectedVersion = "5.1.0"
+
 testGetVersion :: TestTree
 testGetVersion = testCase "getVersion" $ do
   actualVersion <- getVersion
-  actualVersion @?= "5.1.0"
+  actualVersion @?= expectedVersion
 
 testGetCompiledApis :: TestTree
 testGetCompiledApis = testCase "getCompiledApis" $ do
@@ -72,6 +76,13 @@ testAudio = testCase "audio" $ do
   defIn <- getDefaultInputDevice audio
   assertInRange "default input" 0 (numDevs - 1) defIn
 
+testReport :: TestTree
+testReport = testCase "report" $ do
+  Report actualVersion actualApiReports <- buildReport
+  actualVersion @?= expectedVersion
+  -- TODO(ejconlon) Fill in
+  -- assertNonEmpty "api reports" actualApiReports
+
 main :: IO ()
 main = defaultMain $ testGroup "RtAudio"
   [ testGetVersion
@@ -80,4 +91,5 @@ main = defaultMain $ testGroup "RtAudio"
   , testApiDisplayName
   , testApiByName
   , testAudio
+  , testReport
   ]

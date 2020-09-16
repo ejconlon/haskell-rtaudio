@@ -76,7 +76,8 @@ data Api
   | AsioApi
   | DsApi
   | DummyApi
-  deriving (Eq, Show)
+  deriving stock (Eq, Show, Ord, Generic)
+  deriving anyclass (NFData)
 
 instance Bounded Api where
   minBound = UnspecifiedApi
@@ -117,7 +118,8 @@ data ErrorCode =
   | DriverErrorCode
   | SystemErrorCode
   | ThreadErrorCode
-  deriving (Eq, Show)
+  deriving stock (Eq, Show, Ord, Generic)
+  deriving anyclass (NFData)
 
 instance Bounded ErrorCode where
   minBound = WarningCode
