@@ -1,6 +1,11 @@
 module Sound.RtAudio
   ( Api (..)
   , Audio
+  , StreamCallback
+  , InputStreamCallback
+  , OutputStreamCallback
+  , DuplexStreamCallback
+  , ErrorCallback
   , Error (..)
   , DeviceInfo (..)
   , StreamParams (..)
@@ -32,21 +37,38 @@ module Sound.RtAudio
   , getDeviceInfo
   , getDefaultOutputDevice
   , getDefaultInputDevice
+  , openInputStream
+  , openOutputStream
+  , openDuplexStream
+  , closeStream
   ) where
 
 import Control.Exception (Exception, throwIO)
 import Control.Monad (unless)
+import Control.Monad.IO.Class (MonadIO (..))
+import Control.Monad.IO.Unlift (MonadUnliftIO (..))
 import Data.Bits ((.&.))
-import Foreign (Ptr, alloca, nullPtr, peek, peekArray)
+import Foreign (Ptr, Storable (..), alloca, nullPtr, peek, peekArray)
 import Foreign.C (CInt (..), peekCString, withCString)
 import Foreign.ForeignPtr (ForeignPtr, newForeignPtr, withForeignPtr)
+import Sound.RtAudio.Buffers
 import Sound.RtAudio.Foreign
 
 -- | An internal RtAudio error
-newtype Error = Error String deriving (Eq, Show)
+newtype Error = Error String deriving stock (Eq, Show)
 instance Exception Error
 
-newtype Audio = Audio { unAudio :: ForeignPtr AudioInternal } deriving (Eq, Show)
+newtype Audio = Audio { unAudio :: ForeignPtr AudioInternal } deriving stock (Eq, Show)
+
+type StreamCallback m e = Double -> StreamStatus -> e -> m ()
+
+type InputStreamCallback m a = StreamCallback m (InputBuffer a)
+
+type OutputStreamCallback m a = StreamCallback m (OutputBuffer a)
+
+type DuplexStreamCallback m a = StreamCallback m (DuplexBuffer a)
+
+type ErrorCallback m = ErrorCode -> String -> m ()
 
 -- Throws an error if present.
 guardError :: Ptr AudioInternal -> IO ()
@@ -63,60 +85,72 @@ withAudioStruct :: Audio -> (Ptr AudioInternal -> IO a) -> IO a
 withAudioStruct audio f = withAudioStructUnguarded audio (\ptr -> f ptr <* guardError ptr)
 
 -- | Returns the version string of the RtAudio API (e.g. "5.1.0").
-getVersion :: IO String
-getVersion = rtaudio_version >>= peekCString
+getVersion :: MonadIO m => m String
+getVersion = liftIO (rtaudio_version >>= peekCString)
 
 -- | Returns a list of all supported RtMidi APIs.
-getCompiledApis :: IO [Api]
-getCompiledApis = do
+getCompiledApis :: MonadIO m => m [Api]
+getCompiledApis = liftIO $ do
   n <- rtaudio_get_num_compiled_apis
   ptr <- rtaudio_compiled_api
   arr <- peekArray (fromIntegral n) ptr
   pure (fmap toApi arr)
 
 -- | Returns the internal name of the RtMidi API.
-apiName :: Api -> IO String
-apiName api = rtaudio_api_name (fromApi api) >>= peekCString
+apiName :: MonadIO m => Api -> m String
+apiName api = liftIO (rtaudio_api_name (fromApi api) >>= peekCString)
 
 -- | Returns the display name of the RtMidi API.
-apiDisplayName :: Api -> IO String
-apiDisplayName api = rtaudio_api_display_name (fromApi api) >>= peekCString
+apiDisplayName :: MonadIO m => Api -> m String
+apiDisplayName api = liftIO (rtaudio_api_display_name (fromApi api) >>= peekCString)
 
 -- | Looks up the RtMidi API by its /internal/ name.
 --
 -- Note that this is the name from 'apiName', not 'apiDisplayName'.
 -- If not found, returns 'UnspecifiedApi'.
-apiByName :: String -> IO Api
-apiByName name = fmap toApi (withCString name rtaudio_compiled_api_by_name)
+apiByName :: MonadIO m => String -> m Api
+apiByName name = liftIO (fmap toApi (withCString name rtaudio_compiled_api_by_name))
 
 -- | Creates an 'Audio' interface using the given API, or throws an error.
-createAudio :: Api -> IO Audio
-createAudio api = do
+createAudio :: MonadIO m => Api -> m Audio
+createAudio api = liftIO $ do
   ast <- rtaudio_create (fromApi api)
   fptr <- newForeignPtr rtaudio_destroy ast
   guardError ast
   pure (Audio fptr)
 
 -- | Returns the API used by the 'Audio' interface.
-currentApi :: Audio -> IO Api
-currentApi = flip withAudioStructUnguarded (fmap toApi . rtaudio_current_api)
+currentApi :: MonadIO m => Audio -> m Api
+currentApi = liftIO . flip withAudioStructUnguarded (fmap toApi . rtaudio_current_api)
 
 -- | Returns the number of devices available to the 'Audio' interface.
-deviceCount :: Audio -> IO Int
-deviceCount = flip withAudioStructUnguarded (fmap fromIntegral . rtaudio_device_count)
+deviceCount :: MonadIO m => Audio -> m Int
+deviceCount = liftIO . flip withAudioStructUnguarded (fmap fromIntegral . rtaudio_device_count)
 
 -- | Returns 'DeviceInfo' for the given audio device.
 -- The index must be less than or equal to the count returned by 'audioDeviceCount',
 -- otherwise it throws an 'Error'.
-getDeviceInfo :: Audio -> Int -> IO DeviceInfo
-getDeviceInfo audio index = withAudioStruct audio $ \ptr -> alloca $ \dptr -> do
+getDeviceInfo :: MonadIO m => Audio -> Int -> m DeviceInfo
+getDeviceInfo audio index = liftIO $ withAudioStruct audio $ \ptr -> alloca $ \dptr -> do
   rtaudio_get_device_info ptr (fromIntegral index) dptr
   peek dptr
 
-getDefaultOutputDevice :: Audio -> IO Int
-getDefaultOutputDevice audio = withAudioStruct audio $ \ptr ->
+getDefaultOutputDevice :: MonadIO m => Audio -> m Int
+getDefaultOutputDevice audio = liftIO $ withAudioStruct audio $ \ptr ->
   fmap fromIntegral (rtaudio_get_default_output_device ptr)
 
-getDefaultInputDevice :: Audio -> IO Int
-getDefaultInputDevice audio = withAudioStruct audio $ \ptr ->
+getDefaultInputDevice :: MonadIO m => Audio -> m Int
+getDefaultInputDevice audio = liftIO $ withAudioStruct audio $ \ptr ->
   fmap fromIntegral (rtaudio_get_default_output_device ptr)
+
+openInputStream :: (MonadUnliftIO m, Storable a) => Audio -> InputStreamCallback m a -> ErrorCallback m -> m ()
+openInputStream = undefined
+
+openOutputStream :: (MonadUnliftIO m, Storable a) => Audio -> OutputStreamCallback m a -> ErrorCallback m -> m ()
+openOutputStream = undefined
+
+openDuplexStream :: (MonadUnliftIO m, Storable a) => Audio -> DuplexStreamCallback m a -> ErrorCallback m -> m ()
+openDuplexStream = undefined
+
+closeStream :: MonadIO m => Audio -> m ()
+closeStream = liftIO . flip withAudioStruct rtaudio_close_stream

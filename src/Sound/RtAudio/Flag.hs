@@ -10,7 +10,7 @@ class Monoid a => Flag a where
   matchFlag :: a -> a -> Bool
 
 -- | A 'Flag' that works by combining values with bitwise-or, and matching them with bitwise-and.
-newtype BitFlag a = BitFlag { unBitFlag :: a } deriving (Eq, Show)
+newtype BitFlag a = BitFlag { unBitFlag :: a } deriving stock (Eq, Show)
 
 instance Bits a => Semigroup (BitFlag a) where
   (BitFlag x) <> (BitFlag y) = BitFlag (x .|. y)

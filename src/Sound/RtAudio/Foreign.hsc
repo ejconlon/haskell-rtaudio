@@ -1,17 +1,17 @@
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Sound.RtAudio.Foreign where
 
 #include "rtaudio_c.h"
 #include "wrapper.h"
 
+import Control.DeepSeq (NFData)
 import Data.Int (Int32)
 import Data.Word (Word32, Word64)
 import Foreign (FunPtr, Ptr, Storable (..), nullPtr, peekArray, plusPtr, pokeArray, pokeArray0)
 import Foreign.C (CBool (..), CDouble (..), CInt (..), CString (..), CUInt (..), castCharToCChar, peekCString)
+import GHC.Generics (Generic)
 import Sound.RtAudio.Flag (Flag, BitFlag (..))
 
 unCBool :: CBool -> Bool
@@ -30,7 +30,8 @@ pokeCStringLen :: Int -> CString -> String -> IO ()
 pokeCStringLen mlen dst = pokeArray0 (castCharToCChar '\0') dst . fmap castCharToCChar . take (pred mlen)
 
 newtype Format = Format { unFormat :: Word64 }
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
+  deriving newtype (NFData)
   deriving (Semigroup, Monoid, Flag) via (BitFlag Word64)
 
 formatInt8, formatInt16, formatInt24, formatInt32, formatFloat32, formatFloat64 :: Format
@@ -42,7 +43,8 @@ formatFloat32 = Format #{const RTAUDIO_FORMAT_FLOAT32}
 formatFloat64 = Format #{const RTAUDIO_FORMAT_FLOAT64}
 
 newtype StreamFlags = StreamFlags { unStreamFlags :: Word32 }
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
+  deriving newtype (NFData)
   deriving (Semigroup, Monoid, Flag) via (BitFlag Word32)
 
 flagsNoninterleaved, flagsMinimizeLatency, flagsScheduleRealtime, flagsAlsaUseDefault, flagsJackDontConnect :: StreamFlags
@@ -55,7 +57,8 @@ flagsJackDontConnect = StreamFlags 0x20 -- #{const RTAUDIO_FLAGS_JACK_DONT_CONNE
 -- TODO(ejconlon) Why does this one fail? ^^
 
 newtype StreamStatus = StreamStatus { unStreamStatus :: Word32 }
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
+  deriving newtype (NFData)
   deriving (Semigroup, Monoid, Flag) via (BitFlag Word32)
 
 statusInputUnderflow, statusOutputUnderflow :: StreamStatus
@@ -177,7 +180,8 @@ data DeviceInfo = DeviceInfo
   , diPreferredSampleRate :: !Word32
   , diSampleRates :: ![Int32]
   , diName :: !String
-  } deriving (Eq, Show)
+  } deriving stock (Eq, Show, Generic)
+    deriving anyclass (NFData)
 
 numSampleRates :: Int
 numSampleRates = #{const NUM_SAMPLE_RATES}
@@ -216,7 +220,8 @@ data StreamParams = StreamParams
   { spDeviceId :: !Word32
   , spNumChannels :: !Word32
   , spFirstChannel :: !Word32
-  } deriving (Eq, Show)
+  } deriving stock (Eq, Show, Generic)
+    deriving anyclass (NFData)
 
 instance Storable StreamParams where
   sizeOf _ = #{size rtaudio_stream_parameters_t}
@@ -236,7 +241,8 @@ data StreamOptions = StreamOptions
   , soNumBuffers :: !Word32
   , soPriority :: !Int32
   , soName :: !String
-  } deriving (Eq, Show)
+  } deriving stock (Eq, Show, Generic)
+    deriving anyclass (NFData)
 
 instance Storable StreamOptions where
   sizeOf _ = #{size rtaudio_stream_options_t}
