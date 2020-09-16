@@ -19,6 +19,11 @@ assertInRange thing lo hi val
   | val > hi = assertFailure (thing ++ " greater than max bound (" ++ show val ++ " > " ++ show hi ++ ")")
   | otherwise = pure ()
 
+assertMember :: (Eq a, Show a) => String -> String -> a -> [a] -> IO ()
+assertMember thingVal thingLst val lst
+  | elem val lst = pure ()
+  | otherwise = assertFailure (thingVal ++ " " ++ show val ++ " is not member of " ++ thingLst ++ " " ++ show lst)
+
 expectedVersion :: String
 expectedVersion = "5.1.0"
 
@@ -30,8 +35,7 @@ testGetVersion = testCase "getVersion" $ do
 testGetCompiledApis :: TestTree
 testGetCompiledApis = testCase "getCompiledApis" $ do
   compiledApis <- getCompiledApis
-  let numApis = length compiledApis
-  assertPositive "num compiled apis" numApis
+  assertNonEmpty "compiled apis" compiledApis
 
 testApiName :: TestTree
 testApiName = testCase "apiName" $ do
@@ -66,22 +70,23 @@ testAudio = testCase "audio" $ do
   audio <- createAudio expectedApi
   actualApi <- currentApi audio
   actualApi @?= expectedApi
-  numDevs <- deviceCount audio
-  assertPositive "device count" numDevs
-  for_ [0 .. numDevs - 1] $ \index -> do
+  devCount <- deviceCount audio
+  assertPositive "device count" devCount
+  for_ [0 .. devCount - 1] $ \index -> do
     info <- getDeviceInfo audio index
     assertNonEmpty "device info name" (diName info)
+    assertMember "preferred SR" "supportedSRs" (diPreferredSampleRate info) (fmap fromIntegral (diSampleRates info))
   defOut <- getDefaultOutputDevice audio
-  assertInRange "default output" 0 (numDevs - 1) defOut
+  assertInRange "default output" 0 (devCount - 1) defOut
   defIn <- getDefaultInputDevice audio
-  assertInRange "default input" 0 (numDevs - 1) defIn
+  assertInRange "default input" 0 (devCount - 1) defIn
 
 testReport :: TestTree
 testReport = testCase "report" $ do
+  -- We could test more but we mostly just want to make sure we can run 'buildReport'.
+  -- The rest is covered by 'testAudio'.
   Report actualVersion actualApiReports <- buildReport
   actualVersion @?= expectedVersion
-  -- TODO(ejconlon) Fill in
-  -- assertNonEmpty "api reports" actualApiReports
 
 main :: IO ()
 main = defaultMain $ testGroup "RtAudio"

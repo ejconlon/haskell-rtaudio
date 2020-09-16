@@ -215,7 +215,7 @@ instance Storable DeviceInfo where
       fmap unCBool (#{peek rtaudio_device_info_t, is_default_input} ptr) <*>
       fmap unCUInt (#{peek rtaudio_device_info_t, native_formats} ptr) <*>
       fmap unCUInt (#{peek rtaudio_device_info_t, preferred_sample_rate} ptr) <*>
-      fmap (fmap unCInt) (peekArray numSampleRates (#{ptr rtaudio_device_info_t, sample_rates} ptr)) <*>
+      fmap (filter (>0) . fmap unCInt) (peekArray numSampleRates (#{ptr rtaudio_device_info_t, sample_rates} ptr)) <*>
       peekCString (#{ptr rtaudio_device_info_t, name} ptr)
 
 data StreamParams = StreamParams
