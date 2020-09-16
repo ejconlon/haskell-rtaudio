@@ -22,9 +22,12 @@ data Report = Report
   } deriving stock (Eq, Show, Generic)
     deriving anyclass (NFData)
 
+buildApiReport :: MonadIO m => Api -> m ApiReport
+buildApiReport api = pure (ApiReport api)
+
 buildReport :: MonadIO m => m Report
 buildReport = do
   version <- getVersion
-  -- TODO(ejconlon) Fill in
-  let apiReports = []
+  apis <- getCompiledApis
+  apiReports <- traverse buildApiReport apis
   pure (Report version apiReports)

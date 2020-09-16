@@ -14,3 +14,7 @@ update-sources:
 .PHONY: citest
 citest: build
 	# All we can do on CI is build.
+
+.PHONY: report
+report: build
+	stack exec -- rtaudio-report

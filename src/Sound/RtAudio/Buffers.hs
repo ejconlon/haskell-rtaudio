@@ -4,25 +4,33 @@
 
 module Sound.RtAudio.Buffers
   ( Buffer (..)
-  , InputBuffer (..)
+  , InputBuffer
   , foreignInputBuffer
   , readInputBuffer
-  , OutputBuffer (..)
+  , dumpInputBuffer
+  , OutputBuffer
   , foreignOutputBuffer
   , writeOutputBuffer
+  , setOutputBuffer
   , genOutputBuffer
   , genOutputBufferIO
+  , loadOutputBuffer
   , copyBuffer
-  , DuplexBuffer (..)
+  , DuplexBuffer
+  , duplexBufferOutput
+  , duplexBufferInput
   , foreignDuplexBuffer
   , copyDuplexBuffer
   ) where
 
 import Control.DeepSeq (NFData)
+import Data.Foldable (for_)
+import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Storable.Mutable as VSM
 import Foreign (Storable (..), ForeignPtr, Ptr, nullPtr)
 import GHC.Generics (Generic)
 
+-- This just makes types line up below
 proxyUndefined :: f a -> a
 proxyUndefined = undefined
 
@@ -40,7 +48,10 @@ foreignInputBuffer :: Storable a => ForeignPtr a -> Int -> InputBuffer a
 foreignInputBuffer fptr = InputBuffer . VSM.unsafeFromForeignPtr0 fptr
 
 readInputBuffer :: Storable a => InputBuffer a -> Int -> IO a
-readInputBuffer = undefined
+readInputBuffer = VSM.read . unInputBuffer
+
+dumpInputBuffer :: Storable a => InputBuffer a -> IO (VS.Vector a)
+dumpInputBuffer = VS.freeze . unInputBuffer
 
 newtype OutputBuffer a = OutputBuffer { unOutputBuffer :: VSM.IOVector a } deriving newtype (Buffer, NFData)
 
@@ -48,16 +59,22 @@ foreignOutputBuffer :: Storable a => ForeignPtr a -> Int -> OutputBuffer a
 foreignOutputBuffer fptr = OutputBuffer . VSM.unsafeFromForeignPtr0 fptr
 
 writeOutputBuffer :: Storable a => OutputBuffer a -> Int -> a -> IO ()
-writeOutputBuffer = undefined
+writeOutputBuffer = VSM.write . unOutputBuffer
+
+setOutputBuffer :: Storable a => OutputBuffer a -> a -> IO ()
+setOutputBuffer = VSM.set . unOutputBuffer
 
 genOutputBuffer :: Storable a => OutputBuffer a -> (Int -> a) -> IO ()
-genOutputBuffer = undefined
+genOutputBuffer (OutputBuffer ob) f = for_ [0 .. VSM.length ob - 1] (\i -> VSM.unsafeWrite ob i (f i))
 
 genOutputBufferIO :: Storable a => OutputBuffer a -> (Int -> IO a) -> IO ()
-genOutputBufferIO = undefined
+genOutputBufferIO (OutputBuffer ob) f = for_ [0 .. VSM.length ob - 1] (\i -> f i >>= VSM.unsafeWrite ob i)
+
+loadOutputBuffer :: Storable a => InputBuffer a -> VS.Vector a -> IO ()
+loadOutputBuffer = VS.copy . unInputBuffer
 
 copyBuffer :: Storable a => OutputBuffer a -> InputBuffer a -> IO ()
-copyBuffer = undefined
+copyBuffer (OutputBuffer ob) (InputBuffer ib) = VSM.copy ob ib
 
 data DuplexBuffer a = DuplexBuffer
   { duplexBufferOutput :: !(OutputBuffer a)
@@ -70,7 +87,7 @@ instance Buffer DuplexBuffer where
   bufferByteSize (DuplexBuffer o _) = bufferByteSize o
 
 foreignDuplexBuffer :: Storable a => ForeignPtr a -> ForeignPtr a -> Int -> DuplexBuffer a
-foreignDuplexBuffer = undefined
+foreignDuplexBuffer op ip len = DuplexBuffer (foreignOutputBuffer op len) (foreignInputBuffer ip len)
 
 copyDuplexBuffer :: Storable a => DuplexBuffer a -> IO ()
 copyDuplexBuffer (DuplexBuffer o i) = copyBuffer o i
