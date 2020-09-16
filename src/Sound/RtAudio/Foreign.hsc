@@ -12,7 +12,7 @@ import Data.Word (Word32, Word64)
 import Foreign (FunPtr, Ptr, Storable (..), nullPtr, peekArray, plusPtr, pokeArray, pokeArray0)
 import Foreign.C (CBool (..), CDouble (..), CInt (..), CString (..), CUInt (..), castCharToCChar, peekCString)
 import GHC.Generics (Generic)
-import Sound.RtAudio.Flag (Flag, BitFlag (..))
+import Sound.RtAudio.Flag (BitFlagSet (..), FlagSet, FlagValue (..))
 
 unCBool :: CBool -> Bool
 unCBool (CBool x) = x > 0
@@ -29,41 +29,76 @@ unCUInt (CUInt x) = x
 pokeCStringLen :: Int -> CString -> String -> IO ()
 pokeCStringLen mlen dst = pokeArray0 (castCharToCChar '\0') dst . fmap castCharToCChar . take (pred mlen)
 
-newtype Format = Format { unFormat :: Word64 }
-  deriving stock (Eq, Show)
+newtype FormatSet = FormatSet { unFormat :: Word64 }
+  deriving stock (Eq, Show, Ord)
   deriving newtype (NFData)
-  deriving (Semigroup, Monoid, Flag) via (BitFlag Word64)
+  deriving (Semigroup, Monoid, FlagSet) via (BitFlagSet Word64)
 
-formatInt8, formatInt16, formatInt24, formatInt32, formatFloat32, formatFloat64 :: Format
-formatInt8 = Format #{const RTAUDIO_FORMAT_SINT8}
-formatInt16 = Format #{const RTAUDIO_FORMAT_SINT16}
-formatInt24 = Format #{const RTAUDIO_FORMAT_SINT24}
-formatInt32 = Format #{const RTAUDIO_FORMAT_SINT32}
-formatFloat32 = Format #{const RTAUDIO_FORMAT_FLOAT32}
-formatFloat64 = Format #{const RTAUDIO_FORMAT_FLOAT64}
+data FormatValue =
+    FormatValueInt8
+  | FormatValueInt16
+  | FormatValueInt24
+  | FormatValueInt32
+  | FormatValueFloat32
+  | FormatValueFloat64
+  deriving stock (Eq, Show, Ord, Bounded, Enum, Generic)
+  deriving anyclass (NFData)
 
-newtype StreamFlags = StreamFlags { unStreamFlags :: Word32 }
-  deriving stock (Eq, Show)
+instance FlagValue FormatValue where
+  type AssocFlagSet FormatValue = FormatSet
+  toFlagSet v =
+    case v of
+      FormatValueInt8 -> FormatSet #{const RTAUDIO_FORMAT_SINT8}
+      FormatValueInt16 -> FormatSet #{const RTAUDIO_FORMAT_SINT16}
+      FormatValueInt24 -> FormatSet #{const RTAUDIO_FORMAT_SINT24}
+      FormatValueInt32 -> FormatSet #{const RTAUDIO_FORMAT_SINT32}
+      FormatValueFloat32 -> FormatSet #{const RTAUDIO_FORMAT_FLOAT32}
+      FormatValueFloat64 -> FormatSet #{const RTAUDIO_FORMAT_FLOAT64}
+
+newtype StreamFlagsSet = StreamFlagsSet { unStreamFlagsSet :: Word32 }
+  deriving stock (Eq, Show, Ord)
   deriving newtype (NFData)
-  deriving (Semigroup, Monoid, Flag) via (BitFlag Word32)
+  deriving (Semigroup, Monoid, FlagSet) via (BitFlagSet Word32)
 
-flagsNoninterleaved, flagsMinimizeLatency, flagsScheduleRealtime, flagsAlsaUseDefault, flagsJackDontConnect :: StreamFlags
-flagsNoninterleaved = StreamFlags #{const RTAUDIO_FLAGS_NONINTERLEAVED}
-flagsMinimizeLatency = StreamFlags #{const RTAUDIO_FLAGS_MINIMIZE_LATENCY}
-flagsHogDevice = StreamFlags #{const RTAUDIO_FLAGS_HOG_DEVICE}
-flagsScheduleRealtime = StreamFlags #{const RTAUDIO_FLAGS_SCHEDULE_REALTIME}
-flagsAlsaUseDefault = StreamFlags #{const RTAUDIO_FLAGS_ALSA_USE_DEFAULT}
-flagsJackDontConnect = StreamFlags 0x20 -- #{const RTAUDIO_FLAGS_JACK_DONT_CONNECT}
--- TODO(ejconlon) Why does this one fail? ^^
+data StreamFlagsValue =
+    StreamFlagsValueNoninterleaved
+  | StreamFlagsValueMinimizeLatency
+  | StreamFlagsValueHogDevice
+  | StreamFlagsValueScheduleRealtime
+  | StreamFlagsValueAlsaUseDefault
+  | StreamFlagsValueJackDontConnect
+  deriving stock (Eq, Show, Ord, Bounded, Enum, Generic)
+  deriving anyclass (NFData)
 
-newtype StreamStatus = StreamStatus { unStreamStatus :: Word32 }
-  deriving stock (Eq, Show)
+instance FlagValue StreamFlagsValue where
+  type AssocFlagSet StreamFlagsValue = StreamFlagsSet
+  toFlagSet v =
+    case v of
+      StreamFlagsValueNoninterleaved -> StreamFlagsSet #{const RTAUDIO_FLAGS_NONINTERLEAVED}
+      StreamFlagsValueMinimizeLatency -> StreamFlagsSet #{const RTAUDIO_FLAGS_MINIMIZE_LATENCY}
+      StreamFlagsValueHogDevice -> StreamFlagsSet #{const RTAUDIO_FLAGS_HOG_DEVICE}
+      StreamFlagsValueScheduleRealtime -> StreamFlagsSet #{const RTAUDIO_FLAGS_SCHEDULE_REALTIME}
+      StreamFlagsValueAlsaUseDefault -> StreamFlagsSet #{const RTAUDIO_FLAGS_ALSA_USE_DEFAULT}
+      StreamFlagsValueJackDontConnect -> StreamFlagsSet 0x20 -- #{const RTAUDIO_FLAGS_JACK_DONT_CONNECT}
+      -- TODO(ejconlon) Why does this one fail? ^^
+
+newtype StreamStatusSet = StreamStatusSet { unStreamStatusSet :: Word32 }
+  deriving stock (Eq, Show, Ord)
   deriving newtype (NFData)
-  deriving (Semigroup, Monoid, Flag) via (BitFlag Word32)
+  deriving (Semigroup, Monoid, FlagSet) via (BitFlagSet Word32)
 
-statusInputUnderflow, statusOutputUnderflow :: StreamStatus
-statusInputUnderflow = StreamStatus #{const RTAUDIO_STATUS_INPUT_OVERFLOW}
-statusOutputUnderflow = StreamStatus #{const RTAUDIO_STATUS_OUTPUT_UNDERFLOW}
+data StreamStatusValue =
+    StreamStatusValueInputUnderflow
+  | StreamStatusValueOutputOverflow
+  deriving stock (Eq, Show, Ord, Bounded, Enum, Generic)
+  deriving anyclass (NFData)
+
+instance FlagValue StreamStatusValue where
+  type AssocFlagSet StreamStatusValue = StreamStatusSet
+  toFlagSet v =
+    case v of
+      StreamStatusValueInputUnderflow -> StreamStatusSet #{const RTAUDIO_STATUS_INPUT_OVERFLOW}
+      StreamStatusValueOutputOverflow -> StreamStatusSet #{const RTAUDIO_STATUS_OUTPUT_UNDERFLOW}
 
 data Api
   = UnspecifiedApi
@@ -76,35 +111,8 @@ data Api
   | AsioApi
   | DsApi
   | DummyApi
-  deriving stock (Eq, Show, Ord, Generic)
+  deriving stock (Eq, Show, Ord, Generic, Bounded, Enum)
   deriving anyclass (NFData)
-
-instance Bounded Api where
-  minBound = UnspecifiedApi
-  maxBound = DummyApi
-
-instance Enum Api where
-  fromEnum UnspecifiedApi = 0
-  fromEnum AlsaApi = 1
-  fromEnum PulseApi = 2
-  fromEnum OssApi = 3
-  fromEnum JackApi = 4
-  fromEnum CoreApi = 5
-  fromEnum WasApi = 6
-  fromEnum AsioApi = 7
-  fromEnum DsApi = 8
-  fromEnum DummyApi = 9
-  toEnum 0 = UnspecifiedApi
-  toEnum 1 = AlsaApi
-  toEnum 2 = PulseApi
-  toEnum 3 = OssApi
-  toEnum 4 = JackApi
-  toEnum 5 = CoreApi
-  toEnum 6 = WasApi
-  toEnum 7 = AsioApi
-  toEnum 8 = DsApi
-  toEnum 9 = DummyApi
-  toEnum i = error ("Undefined Api: " ++ show i)
 
 data ErrorCode =
     WarningCode
@@ -118,37 +126,8 @@ data ErrorCode =
   | DriverErrorCode
   | SystemErrorCode
   | ThreadErrorCode
-  deriving stock (Eq, Show, Ord, Generic)
+  deriving stock (Eq, Show, Ord, Generic, Enum, Bounded)
   deriving anyclass (NFData)
-
-instance Bounded ErrorCode where
-  minBound = WarningCode
-  maxBound = ThreadErrorCode
-
-instance Enum ErrorCode where
-  fromEnum WarningCode = 0
-  fromEnum DebugWarningCode = 1
-  fromEnum UnspecifiedCode = 2
-  fromEnum NoDevicesFoundCode = 3
-  fromEnum InvalidDeviceCode = 4
-  fromEnum MemoryErrorCode = 5
-  fromEnum InvalidParameterCode = 6
-  fromEnum InvalidUseCode = 7
-  fromEnum DriverErrorCode = 8
-  fromEnum SystemErrorCode = 9
-  fromEnum ThreadErrorCode = 10
-  toEnum 0 = WarningCode
-  toEnum 1 = DebugWarningCode
-  toEnum 2 = UnspecifiedCode
-  toEnum 3 = NoDevicesFoundCode
-  toEnum 4 = InvalidDeviceCode
-  toEnum 5 = MemoryErrorCode
-  toEnum 6 = InvalidParameterCode
-  toEnum 7 = InvalidUseCode
-  toEnum 8 = DriverErrorCode
-  toEnum 9 = SystemErrorCode
-  toEnum 10 = ThreadErrorCode
-  toEnum i = error ("Undefined ErrorCode: " ++ show i)
 
 -- Will be mapped to Api
 newtype ApiInternal = ApiInternal { unApiInternal :: CInt } deriving newtype (Storable)
@@ -239,7 +218,7 @@ instance Storable StreamParams where
       fmap unCUInt (#{peek rtaudio_stream_parameters_t, first_channel} ptr)
 
 data StreamOptions = StreamOptions
-  { soFlags :: !StreamFlags
+  { soFlags :: !StreamFlagsSet
   , soNumBuffers :: !Word32
   , soPriority :: !Int32
   , soName :: !String
@@ -250,13 +229,13 @@ instance Storable StreamOptions where
   sizeOf _ = #{size rtaudio_stream_options_t}
   alignment _ = #{alignment rtaudio_stream_options_t}
   poke ptr s = do
-    #{poke rtaudio_stream_options_t, flags} ptr (CUInt (unStreamFlags (soFlags s)))
+    #{poke rtaudio_stream_options_t, flags} ptr (CUInt (unStreamFlagsSet (soFlags s)))
     #{poke rtaudio_stream_options_t, num_buffers} ptr (CUInt (soNumBuffers s))
     #{poke rtaudio_stream_options_t, priority} ptr (CInt (soPriority s))
     pokeCStringLen maxNameLength (#{ptr rtaudio_stream_options_t, name} ptr) (soName s)
   peek ptr =
     StreamOptions <$>
-      fmap (StreamFlags . unCUInt) (#{peek rtaudio_stream_options_t, flags} ptr) <*>
+      fmap (StreamFlagsSet . unCUInt) (#{peek rtaudio_stream_options_t, flags} ptr) <*>
       fmap unCUInt (#{peek rtaudio_stream_options_t, num_buffers} ptr) <*>
       fmap unCInt (#{peek rtaudio_stream_options_t, priority} ptr) <*>
       peekCString (#{ptr rtaudio_stream_options_t, name} ptr)

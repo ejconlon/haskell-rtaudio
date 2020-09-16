@@ -1,9 +1,10 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 
 module Sound.RtAudio.Buffers
   ( Buffer (..)
+  , BufferType (..)
+  , ReflectBuffer (..)
   , InputBuffer
   , foreignInputBuffer
   , readInputBuffer
@@ -27,7 +28,7 @@ import Control.DeepSeq (NFData)
 import Data.Foldable (for_)
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Storable.Mutable as VSM
-import Foreign (Storable (..), ForeignPtr, Ptr, nullPtr)
+import Foreign (ForeignPtr, Ptr, Storable (..), newForeignPtr_, nullPtr)
 import GHC.Generics (Generic)
 
 -- This just makes types line up below
@@ -38,11 +39,25 @@ class Buffer b where
   newBuffer :: Storable a => Int -> IO (b a)
   bufferByteSize :: Storable a => b a -> Int
 
+data BufferType =
+    InputBufferType
+  | OutputBufferType
+  | DuplexBufferType
+  deriving (Eq, Show)
+
+class Buffer b => ReflectBuffer b where
+  reflectBufferType :: proxy (b a) -> BufferType
+  rawBuffer :: Storable a => Ptr a -> Ptr a -> Int -> IO (b a)
+
 instance Buffer VSM.IOVector where
   newBuffer = VSM.new
   bufferByteSize v = sizeOf (proxyUndefined v) * VSM.length v
 
 newtype InputBuffer a = InputBuffer { unInputBuffer :: VSM.IOVector a } deriving newtype (Buffer, NFData)
+
+instance ReflectBuffer InputBuffer where
+  reflectBufferType _ = InputBufferType
+  rawBuffer _ inp len = fmap (`foreignInputBuffer` len) (newForeignPtr_ inp)
 
 foreignInputBuffer :: Storable a => ForeignPtr a -> Int -> InputBuffer a
 foreignInputBuffer fptr = InputBuffer . VSM.unsafeFromForeignPtr0 fptr
@@ -54,6 +69,10 @@ dumpInputBuffer :: Storable a => InputBuffer a -> IO (VS.Vector a)
 dumpInputBuffer = VS.freeze . unInputBuffer
 
 newtype OutputBuffer a = OutputBuffer { unOutputBuffer :: VSM.IOVector a } deriving newtype (Buffer, NFData)
+
+instance ReflectBuffer OutputBuffer where
+  reflectBufferType _ = OutputBufferType
+  rawBuffer outp _ len = fmap (`foreignOutputBuffer` len) (newForeignPtr_ outp)
 
 foreignOutputBuffer :: Storable a => ForeignPtr a -> Int -> OutputBuffer a
 foreignOutputBuffer fptr = OutputBuffer . VSM.unsafeFromForeignPtr0 fptr
@@ -85,6 +104,10 @@ data DuplexBuffer a = DuplexBuffer
 instance Buffer DuplexBuffer where
   newBuffer sz = DuplexBuffer <$> newBuffer sz <*> newBuffer sz
   bufferByteSize (DuplexBuffer o _) = bufferByteSize o
+
+instance ReflectBuffer DuplexBuffer where
+  reflectBufferType _ = DuplexBufferType
+  rawBuffer outp inp len = foreignDuplexBuffer <$> newForeignPtr_ outp <*> newForeignPtr_ inp <*> pure len
 
 foreignDuplexBuffer :: Storable a => ForeignPtr a -> ForeignPtr a -> Int -> DuplexBuffer a
 foreignDuplexBuffer op ip len = DuplexBuffer (foreignOutputBuffer op len) (foreignInputBuffer ip len)

@@ -15,6 +15,12 @@ update-sources:
 citest: build
 	# All we can do on CI is build.
 
-.PHONY: report
-report: build
+.PHONY: example-report
+example-report: build
+	# Print a report of availble audio device info
 	stack exec -- rtaudio-report
+
+.PHONY: example-playback
+example-playback: build
+	# Play a tone on the default output device
+	stack exec -- rtaudio-playback

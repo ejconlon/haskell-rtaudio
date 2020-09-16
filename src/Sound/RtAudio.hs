@@ -7,25 +7,17 @@ module Sound.RtAudio
   , DuplexStreamCallback
   , ErrorCallback
   , Error (..)
+  , Format (..)
   , DeviceInfo (..)
   , StreamParams (..)
   , StreamOptions (..)
-  , Format
-  , formatInt8
-  , formatInt16
-  , formatInt24
-  , formatInt32
-  , formatFloat32
-  , formatFloat64
-  , StreamStatus
-  , statusInputUnderflow
-  , statusOutputUnderflow
-  , StreamFlags
-  , flagsNoninterleaved
-  , flagsMinimizeLatency
-  , flagsScheduleRealtime
-  , flagsAlsaUseDefault
-  , flagsJackDontConnect
+  , FormatSet
+  , FormatValue (..)
+  , StreamStatusSet
+  , StreamStatusValue (..)
+  , StreamFlagsSet
+  , StreamFlagsValue (..)
+  , formatValue
   , getVersion
   , getCompiledApis
   , apiName
@@ -48,6 +40,9 @@ import Control.Monad (unless)
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.IO.Unlift (MonadUnliftIO (..))
 import Data.Bits ((.&.))
+import Data.Int (Int16, Int32, Int8)
+import Data.Int.Int24 (Int24)
+import Data.Proxy (Proxy (..))
 import Foreign (Ptr, Storable (..), alloca, nullPtr, peek, peekArray)
 import Foreign.C (CInt (..), peekCString, withCString)
 import Foreign.ForeignPtr (ForeignPtr, newForeignPtr, withForeignPtr)
@@ -60,7 +55,7 @@ instance Exception Error
 
 newtype Audio = Audio { unAudio :: ForeignPtr AudioInternal } deriving stock (Eq, Show)
 
-type StreamCallback m e = Double -> StreamStatus -> e -> m ()
+type StreamCallback m e = Double -> StreamStatusSet -> e -> m ()
 
 type InputStreamCallback m a = StreamCallback m (InputBuffer a)
 
@@ -69,6 +64,27 @@ type OutputStreamCallback m a = StreamCallback m (OutputBuffer a)
 type DuplexStreamCallback m a = StreamCallback m (DuplexBuffer a)
 
 type ErrorCallback m = ErrorCode -> String -> m ()
+
+data Format a where
+  FormatInt8 :: Format Int8
+  FormatInt16 :: Format Int16
+  FormatInt24 :: Format Int24
+  FormatInt32 :: Format Int32
+  FormatFloat32 :: Format Float
+  FormatFloat64 :: Format Double
+
+deriving stock instance Eq (Format a)
+deriving stock instance Show (Format a)
+
+formatValue :: Format a -> FormatValue
+formatValue f =
+  case f of
+    FormatInt8 -> FormatValueInt8
+    FormatInt16 -> FormatValueInt16
+    FormatInt24 -> FormatValueInt24
+    FormatInt32 -> FormatValueInt32
+    FormatFloat32 -> FormatValueFloat32
+    FormatFloat64 -> FormatValueFloat64
 
 -- Throws an error if present.
 guardError :: Ptr AudioInternal -> IO ()
@@ -143,14 +159,19 @@ getDefaultInputDevice :: MonadIO m => Audio -> m Int
 getDefaultInputDevice audio = liftIO $ withAudioStruct audio $ \ptr ->
   fmap fromIntegral (rtaudio_get_default_output_device ptr)
 
-openInputStream :: (MonadUnliftIO m, Storable a) => Audio -> InputStreamCallback m a -> ErrorCallback m -> m ()
-openInputStream = undefined
+openInputStream :: (MonadUnliftIO m, Storable a) => Audio -> Int -> Format a -> InputStreamCallback m a -> ErrorCallback m -> m ()
+openInputStream = openStream Proxy
 
-openOutputStream :: (MonadUnliftIO m, Storable a) => Audio -> OutputStreamCallback m a -> ErrorCallback m -> m ()
-openOutputStream = undefined
+openOutputStream :: (MonadUnliftIO m, Storable a) => Audio -> Int -> Format a -> OutputStreamCallback m a -> ErrorCallback m -> m ()
+openOutputStream = openStream Proxy
 
-openDuplexStream :: (MonadUnliftIO m, Storable a) => Audio -> DuplexStreamCallback m a -> ErrorCallback m -> m ()
-openDuplexStream = undefined
+openDuplexStream :: (MonadUnliftIO m, Storable a) => Audio -> Int -> Format a -> DuplexStreamCallback m a -> ErrorCallback m -> m ()
+openDuplexStream = openStream Proxy
+
+openStream :: (MonadUnliftIO m, ReflectBuffer b, Storable a) => Proxy (b a) -> Audio -> Int -> Format a -> StreamCallback m (b a) -> ErrorCallback m -> m ()
+openStream proxy audio index fmt streamCb errCb = do
+  let bufferType = reflectBufferType proxy
+  error "TODO"
 
 closeStream :: MonadIO m => Audio -> m ()
 closeStream = liftIO . flip withAudioStruct rtaudio_close_stream
